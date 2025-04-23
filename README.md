@@ -1,2 +1,4 @@
 # ETL-process
-ETK-process data from PGsql to SQLServer 
+ETL-process data from PGsql to SQLServer 
+
+

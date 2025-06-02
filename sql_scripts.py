@@ -106,16 +106,25 @@ where p.diagtype in (1) and v.dep1id IN (SELECT keyid FROM solution_med.dep WHER
 
 stac_query_get_PO_visit = '''
 select 
-	v.keyid as ID,
-	v.patientid as PAT, 
-	(select text from dep where keyid = v.dep1id),
-	case
-		when v.dep1id in (14, 160, 158, 9, 12, 7, 8, 10, 11) then '1'
-		else '0'
-	end as status,
+	v.keyid as id, 
 	v.dat as DAT_ST,
-	v.dat1 as DAT_FIN
-from solution_med.visit v
-where v.vistype = 101
-	and v.dep1id in (select keyid from dep where keyid = v.dep1id and dep.status = 1) and v.patientid is not null
+	v.dat1 as DAT_FIN,
+	case
+		when d.status_dep in (200, 202, 203, 205, 209, 210) then 'Отказ от госпитализации'
+		else d."text"
+	end as depgosp,
+	case 
+		when d.status_dep in (200, 202, 203, 205, 209, 210) then d."text"
+		else 'Госпитализация'
+	end as result,
+	v.patientid AS PAT,
+	dig.code as giag_code,
+	dig."text" as diag_text,
+	pkg_protocol_universal.get_answer(v.keyid, 'PLAN_HOSP', 'RegReception', 'text', 'REGIN') as form_help,
+	pkg_protocol_universal.get_answer(v.keyid, 'WHOSENT', 'RegReception', 'text', 'REGIN') as who
+from solution_med.visit v 
+join solution_med.dep d on v.dep1id = d.keyid
+join solution_med.patdiag p on p.visitid = v.keyid
+join solution_med.diagnos dig on dig.keyid = p.diagid
+where v.vistype = 101 and p.diagtype = 1
 '''

@@ -270,17 +270,19 @@ def process_doc_data(df):
         raise
 
 
-def process_po_visit_data(df_visits, df_patients):
+def process_po_visit_data(df_visits, df_patients, visit_id_column='id'):
     """
     Обрабатывает данные о визитах:
     1. Удаляет строки без ссылки на пациента или с несуществующими пациентами
-    2. Очищает даты от заглушек (заменяет на NaT)
-    3. Удаляет строки с будущими датами
-    4. Проверяет корректность интервала дат (DAT_ST <= DAT_FIN)
+    2. Удаляет дубликаты по идентификатору визита (оставляя первое вхождение)
+    3. Очищает даты от заглушек (заменяет на NaT)
+    4. Удаляет строки с будущими датами
+    5. Проверяет корректность интервала дат (DAT_ST <= DAT_FIN)
     
     Параметры:
         df_visits (pd.DataFrame): Данные о визитах
         df_patients (pd.DataFrame): Данные о пациентах (должен содержать столбец 'keyid')
+        visit_id_column (str): Название столбца с идентификатором визита (по умолчанию 'keyid')
     
     Возвращает:
         pd.DataFrame: Очищенный DataFrame с визитами
@@ -308,29 +310,40 @@ def process_po_visit_data(df_visits, df_patients):
         if removed_invalid_pat > 0:
             logger.warning(f"Удалено {removed_invalid_pat} строк с несуществующими пациентами.")
 
-        # 3. Преобразование дат в datetime
+        # 3. Удаление дубликатов по идентификатору визита
+        if visit_id_column in df_visits.columns:
+            before_dedup = len(df_visits)
+            # Удаляем дубликаты, оставляя первое вхождение
+            df_visits = df_visits.drop_duplicates(subset=[visit_id_column], keep='first')
+            removed_duplicates = before_dedup - len(df_visits)
+            if removed_duplicates > 0:
+                logger.warning(f"Удалено {removed_duplicates} дубликатов по столбцу '{visit_id_column}'.")
+        else:
+            logger.error(f"Столбец '{visit_id_column}' не найден. Удаление дубликатов пропущено.")
+
+        # 4. Преобразование дат в datetime
         date_columns = ['dat_st', 'dat_fin']
         for col in date_columns:
             df_visits[col] = pd.to_datetime(df_visits[col], errors='coerce')
 
-        # 4. Очистка дат-заглушек (например, 30.12.1899)
+        # 5. Очистка дат-заглушек (например, 30.12.1899)
         df_visits[date_columns] = df_visits[date_columns].replace(pd.Timestamp('1899-12-30'), pd.NaT)
 
-        # 5. Удаление строк с будущими датами
+        # 6. Удаление строк с будущими датами
         current_date = datetime.now()
         future_dates_mask = (df_visits['dat_st'] > current_date) | (df_visits['dat_fin'] > current_date)
         if future_dates_mask.any():
             logger.warning(f"Найдено {future_dates_mask.sum()} строк с будущими датами. Они будут удалены.")
             df_visits = df_visits[~future_dates_mask]
 
-        # 6. Проверка корректности интервала дат (DAT_ST <= DAT_FIN)
+        # 7. Проверка корректности интервала дат (DAT_ST <= DAT_FIN)
         valid_dates_mask = df_visits[date_columns].notna().all(axis=1)
         invalid_interval_mask = (df_visits['dat_st'] > df_visits['dat_fin']) & valid_dates_mask
         if invalid_interval_mask.any():
             logger.warning(f"Найдено {invalid_interval_mask.sum()} строк с некорректным интервалом дат (DAT_ST > DAT_FIN). Они будут удалены.")
             df_visits = df_visits[~invalid_interval_mask]
 
-        # 7. Удаление строк, где обе даты NaT (полностью некорректные записи)
+        # 8. Удаление строк, где обе даты NaT (полностью некорректные записи)
         both_dates_invalid = df_visits[date_columns].isna().all(axis=1)
         if both_dates_invalid.any():
             logger.warning(f"Удалено {both_dates_invalid.sum()} строк с полностью некорректными датами.")

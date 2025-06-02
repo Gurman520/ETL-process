@@ -12,8 +12,11 @@ import load as l
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+login = ""
+pas = ""
+
 # Конфигурация подключений
-POSTGRES_CONN_STRING = 'postgresql+psycopg2://login:pass@10.1.1.37:5432/med'
+POSTGRES_CONN_STRING = f'postgresql+psycopg2://{login}:{pas}@10.1.1.37:5432/med'
 SQLSERVER_CONN_STRING = 'mssql+pyodbc://user:password@:1433/mydatabase?driver=ODBC+Driver+17+for+SQL+Server'
 # SQLSERVER_CONN_STRING = (
 #     "mssql+pyodbc://login:pass@localhost:1433/MedData"
